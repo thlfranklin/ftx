@@ -2,6 +2,7 @@
 import time
 import urllib.parse
 from typing import Optional, Dict, Any, List
+from numpy.core.getlimits import MachArLike
 
 from requests import Request, Session, Response
 import hmac
@@ -189,65 +190,84 @@ import pandas as pd
 import time, json
 from time import sleep
 from datetime import datetime
-# import FTX_Class
+
+pd.set_option('display.max_columns',100)
+pd.set_option('precision', 3)
+pd.set_option('display.float_format', lambda x: '%.3f' % x)
+
+hist_rates = pd.DataFrame()
+hist_spot = pd.DataFrame()
+hist_perp = pd.DataFrame()
 
 c = FtxClient(
   api_key="Ee6Fdd5kTDR6wCz9hsD1u1NQdVK8Bcj5av9i9Rf3", 
   api_secret="noOLNqoQD7b7n9NcYFL3XZWE2zvBKtYnk9qNVi9i"
   )
-# c = FTX_Class.FtxClient(api_key="", api_secret="")
+
+i_day = 1
 
 epoch = datetime.utcfromtimestamp(0)
-dt = datetime(2021,12,1)
-unix_start = (dt - epoch).total_seconds()
-unix_end = (datetime(2021,12,2) - epoch).total_seconds()
 
-# trades = c.get_all_trades('BTC-PERP', start_time=unix_time, order='asc')
+#%%
+i_month = 12
+dt = datetime(2021,i_month,1)
+print(f'period: {i_month}/21')
+
+market_perp = 'MKR-PERP'
+market_spot = 'MKR/USD'
+
+unix_start = (dt - epoch).total_seconds()
+unix_end = (datetime(2021,i_month,14) - epoch).total_seconds()
 
 d_params = {
   'start_time': unix_start,
   'end_time': unix_end,
-  'future': 'BTC-PERP',
+  'future': market_perp,
+}
+
+d_params_candle = {
+  'resolution': 3600,
+  'start_time': unix_start,
+  'end_time': unix_end,
 }
 
 response = c._get('funding_rates', d_params)
+candle_perp = c._get(f'/markets/{market_perp}/candles', d_params_candle)
+candle_spot = c._get(f'/markets/{market_spot}/candles', d_params_candle)
 
-if response:
-  min_t = min(response['time'])
-  max_t = max(response['time'])
-  print(f'earlier: {min_t}')
-  print(f'newer: {max_t}')
+# if response:
+df_rates = pd.DataFrame.from_dict(response)
+hist_rates = hist_rates.append(df_rates)
+min_t = min(df_rates['time'])
+max_t = max(df_rates['time'])
+print(f'from: {min_t} to: {max_t}')
 
-#%%
-while True:
-    try:
-        mkt_data = requests.get('https://ftx.com/api/markets/BTC-PERP').json()
-        print(mkt_data['result']['ask'])
-    except Exception as e:
-        print(f'Error obtaining BTC old data: {e}')
-    
-    if mkt_data['result']['ask'] < 52000.0:
-        print('The trade requirement was not satisfied.')
-        sleep(60)
-        continue
-    
-    elif mkt_data['result']['ask'] >= 52000.0:
-        try:
-            r = c.place_order("ETH/USD", "buy", 4800.0, 0.006, "limit")
-            print(r)
-        except Exception as e:
-            print(f'Error making order request: {e}')
-        
-        sleep(2)
-        
-        try:
-            check = c.get_open_orders(r['id'])
-        except Exception as e:
-            print(f'Error checking for order status: {e}')
-            
-        if check[0]['status'] == 'open':
-            print ('Order placed at {}'.format(pd.Timestamp.now()))
-            break
-        else:
-            print('Order was either filled or canceled at {}'.format(pd.Timestamp.now()))
-            break
+hist_spot = hist_spot.append(pd.DataFrame.from_dict(candle_spot))
+hist_perp = hist_perp.append(pd.DataFrame.from_dict(candle_perp))
+print(f'spot data since: {hist_spot.startTime.min()}')
+print(f'perp data since: {hist_perp.startTime.min()}')
+
+unix_start = unix_end
+
+#%% 
+hist_rates.set_index('time', inplace=True)
+hist_spot.set_index('startTime', inplace=True)
+hist_perp.set_index('startTime', inplace=True)
+# else:
+#   continue
+# %%
+# graph
+df_join = hist_rates.join(hist_spot[['open', 'close']], rsuffix='_spot')
+df_join = df_join.join(hist_perp[['open', 'close']], rsuffix='_perp')
+df_join.head()
+
+# %%
+import matplotlib.pyplot as plt
+
+ax = df_join.plot(y=['open', 'open_perp'])
+df_join['rate'].plot(secondary_y=['rate'], ax=ax)
+ 
+plt.show()
+# %%
+df_join.to_csv('funding_rate_MKR.csv')
+# %%
