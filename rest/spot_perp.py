@@ -207,59 +207,71 @@ loaded_secret = data_config['api_secret']
 
 c = FtxClient(api_key=loaded_key, api_secret=loaded_secret)
 
-i_day = 1
 epoch = datetime.utcfromtimestamp(0)
+
+l_markets = ['MKR', 'DOT', 'SRM', 'FTT', 'SOL', 'LUNA', 'BNB', 'LINK', 'ADA', 'NEAR', 'LTC','SUSHI', 'AXS']
 
 #%%
 i_month = 12
+last_day = 16
 dt = datetime(2021,i_month,1)
 print(f'period: {i_month}/21')
 
-market_perp = 'MKR-PERP'
-market_spot = 'MKR/USD'
+# market_i = l_markets[0]
+for market_i in l_markets:
+  market_perp = market_i + '-PERP'
+  market_spot = market_i + '/USD'
 
-unix_start = (dt - epoch).total_seconds()
-unix_end = (datetime(2021,i_month,14) - epoch).total_seconds()
+  unix_start = (dt - epoch).total_seconds()
+  unix_end = (datetime(2021,i_month,last_day) - epoch).total_seconds() + 86400
 
-d_params = {
-  'start_time': unix_start,
-  'end_time': unix_end,
-  'future': market_perp,
-}
+  d_params = {
+    'start_time': unix_start,
+    'end_time': unix_end,
+    'future': market_perp,
+  }
 
-d_params_candle = {
-  'resolution': 3600,
-  'start_time': unix_start,
-  'end_time': unix_end,
-}
+  d_params_candle = {
+    'resolution': 3600,
+    'start_time': unix_start,
+    'end_time': unix_end,
+  }
 
-response = c._get('funding_rates', d_params)
-candle_perp = c._get(f'/markets/{market_perp}/candles', d_params_candle)
-candle_spot = c._get(f'/markets/{market_spot}/candles', d_params_candle)
+  rates_perp = c._get('funding_rates', d_params)
 
-# if response:
-df_rates = pd.DataFrame.from_dict(response)
-hist_rates = hist_rates.append(df_rates)
-min_t = min(df_rates['time'])
-max_t = max(df_rates['time'])
-print(f'from: {min_t} to: {max_t}')
+  candle_perp = c._get(f'/markets/{market_perp}/candles', d_params_candle)
 
-hist_spot = hist_spot.append(pd.DataFrame.from_dict(candle_spot))
-hist_perp = hist_perp.append(pd.DataFrame.from_dict(candle_perp))
-print(f'spot data since: {hist_spot.startTime.min()}')
-print(f'perp data since: {hist_perp.startTime.min()}')
+  try:
+    candle_spot = c._get(f'/markets/{market_spot}/candles', d_params_candle)
+  except Exception:
+    print(f'No such spot market: {market_spot}')
+    market_spot = None
 
-unix_start = unix_end
 
-#%% 
+  if rates_perp:
+    df_rates = pd.DataFrame.from_dict(rates_perp)
+    hist_rates = hist_rates.append(df_rates)
+    min_t = min(df_rates['time'])
+    max_t = max(df_rates['time'])
+    print(f'from: {min_t} to: {max_t}')
+
+  if market_spot:
+    hist_spot = hist_spot.append(pd.DataFrame.from_dict(candle_spot))
+    hist_perp = hist_perp.append(pd.DataFrame.from_dict(candle_perp))
+    print(f'spot data since: {hist_spot.startTime.min()}')
+    print(f'perp data since: {hist_perp.startTime.min()}')
+
+  print(f'month {i_month}/21 finished for market {market_i}')
+
+# unix_start = unix_end
+
+#%% set indexes
 hist_rates.set_index('time', inplace=True)
 hist_spot.set_index('startTime', inplace=True)
 hist_perp.set_index('startTime', inplace=True)
-# else:
-#   continue
-# %%
-# graph
-df_join = hist_rates.join(hist_spot[['open', 'close']], rsuffix='_spot')
+
+# %% join rates, spot and perp data
+df_join = hist_rates.join(hist_spot[['open', 'close']])
 df_join = df_join.join(hist_perp[['open', 'close']], rsuffix='_perp')
 df_join.head()
 
@@ -271,5 +283,5 @@ df_join['rate'].plot(secondary_y=['rate'], ax=ax)
  
 plt.show()
 # %%
-df_join.to_csv('funding_rate_MKR.csv')
+df_join.to_csv('exploring_funding_rates.csv')
 # %%
