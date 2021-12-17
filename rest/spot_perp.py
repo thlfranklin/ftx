@@ -2,7 +2,7 @@
 import time
 import urllib.parse
 from typing import Optional, Dict, Any, List
-from numpy.core.getlimits import MachArLike
+# from numpy.core.getlimits import MachArLike
 
 from requests import Request, Session, Response
 import hmac
@@ -185,11 +185,10 @@ class FtxClient:
 
 #%% MOVE TO ANOTHER FILE AFTER FAMILIARIZING AND IMPORT
 #  using client class
-import requests
 import pandas as pd
-import time, json
-from time import sleep
+import time
 from datetime import datetime
+import yaml
 
 pd.set_option('display.max_columns',100)
 pd.set_option('precision', 3)
@@ -199,13 +198,16 @@ hist_rates = pd.DataFrame()
 hist_spot = pd.DataFrame()
 hist_perp = pd.DataFrame()
 
-c = FtxClient(
-  api_key="Ee6Fdd5kTDR6wCz9hsD1u1NQdVK8Bcj5av9i9Rf3", 
-  api_secret="noOLNqoQD7b7n9NcYFL3XZWE2zvBKtYnk9qNVi9i"
-  )
+with open ('api_config.yaml', 'r') as fl:
+  data_config = yaml.safe_load(fl)
+  # print(dt_load)
+
+loaded_key = data_config['api_key']
+loaded_secret = data_config['api_secret']
+
+c = FtxClient(api_key=loaded_key, api_secret=loaded_secret)
 
 i_day = 1
-
 epoch = datetime.utcfromtimestamp(0)
 
 #%%
