@@ -65,6 +65,9 @@ class FtxClient:
     def get_orderbook(self, market: str, depth: int = None) -> dict:
         return self._get(f'markets/{market}/orderbook', {'depth': depth})
 
+    def get_market(self, market: str) -> dict:
+        return self._get(f'markets/{market}')
+
     def get_trades(self, market: str) -> dict:
         return self._get(f'markets/{market}/trades')
 
@@ -74,6 +77,9 @@ class FtxClient:
     def get_open_orders(self, market: str = None) -> List[dict]:
         return self._get(f'orders', {'market': market})
     
+    def get_historical_price(self, market: str = None, resolution: float = None, start_time: float = None, end_time: float = None) -> List[dict]:
+        return self._get(f'markets/{market}/candles', {'resolution': resolution, 'start_time': start_time, 'end_time': end_time})
+
     def get_order_history(self, market: str = None, side: str = None, order_type: str = None, start_time: float = None, end_time: float = None) -> List[dict]:
         return self._get(f'orders/history', {'market': market, 'side': side, 'orderType': order_type, 'start_time': start_time, 'end_time': end_time})
         
@@ -182,72 +188,3 @@ class FtxClient:
         return results
 
 
-#%% MOVE TO ANOTHER FILE AFTER FAMILIARIZING AND IMPORT
-#  using client class
-import requests
-import pandas as pd
-import time, json
-from time import sleep
-from datetime import datetime
-# import FTX_Class
-
-c = FtxClient(
-  api_key="Ee6Fdd5kTDR6wCz9hsD1u1NQdVK8Bcj5av9i9Rf3", 
-  api_secret="noOLNqoQD7b7n9NcYFL3XZWE2zvBKtYnk9qNVi9i"
-  )
-# c = FTX_Class.FtxClient(api_key="", api_secret="")
-
-epoch = datetime.utcfromtimestamp(0)
-dt = datetime(2021,12,1)
-unix_start = (dt - epoch).total_seconds()
-unix_end = (datetime(2021,12,2) - epoch).total_seconds()
-
-# trades = c.get_all_trades('BTC-PERP', start_time=unix_time, order='asc')
-
-d_params = {
-  'start_time': unix_start,
-  'end_time': unix_end,
-  'future': 'BTC-PERP',
-}
-
-response = c._get('funding_rates', d_params)
-
-if response:
-  min_t = min(response['time'])
-  max_t = max(response['time'])
-  print(f'earlier: {min_t}')
-  print(f'newer: {max_t}')
-
-#%%
-while True:
-    try:
-        mkt_data = requests.get('https://ftx.com/api/markets/BTC-PERP').json()
-        print(mkt_data['result']['ask'])
-    except Exception as e:
-        print(f'Error obtaining BTC old data: {e}')
-    
-    if mkt_data['result']['ask'] < 52000.0:
-        print('The trade requirement was not satisfied.')
-        sleep(60)
-        continue
-    
-    elif mkt_data['result']['ask'] >= 52000.0:
-        try:
-            r = c.place_order("ETH/USD", "buy", 4800.0, 0.006, "limit")
-            print(r)
-        except Exception as e:
-            print(f'Error making order request: {e}')
-        
-        sleep(2)
-        
-        try:
-            check = c.get_open_orders(r['id'])
-        except Exception as e:
-            print(f'Error checking for order status: {e}')
-            
-        if check[0]['status'] == 'open':
-            print ('Order placed at {}'.format(pd.Timestamp.now()))
-            break
-        else:
-            print('Order was either filled or canceled at {}'.format(pd.Timestamp.now()))
-            break
