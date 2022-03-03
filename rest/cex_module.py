@@ -8,8 +8,8 @@ pd.set_option('precision', 3)
 pd.set_option('display.float_format', lambda x: '%.3f' % x)
 
 
-api_key = "_udmleAJsTU6oehu31NnBwif0eYGCwJsFTn_YtVk"
-api_secret = "KXxnh2_myaUSZ9Mh2cIPUs6qlbN1n9yrDy_EJNEh"
+api_key = ""
+api_secret = ""
 subaccount_name = ""  # Main Account
 
 rest_api = client.FtxClient(api_key, api_secret, subaccount_name)
